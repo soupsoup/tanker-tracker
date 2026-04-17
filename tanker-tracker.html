@@ -1,0 +1,1593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tanker Tracker — Shadow Fleet Intelligence</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2236;
+    --border: #1e2d4a;
+    --accent: #00c8ff;
+    --accent2: #ff5252;
+    --accent3: #ffd166;
+    --accent4: #06d6a0;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --card: #141e33;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  header {
+    background: linear-gradient(135deg, #0a0e1a 0%, #0d1b3e 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 18px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-icon {
+    font-size: 28px;
+  }
+  .logo-text {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.3px;
+  }
+  .logo-sub {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .header-meta {
+    text-align: right;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .live-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    background: var(--accent4);
+    border-radius: 50%;
+    margin-right: 6px;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* TABS */
+  .tabs {
+    display: flex;
+    gap: 0;
+    padding: 0 28px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .tab-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    padding: 14px 22px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    white-space: nowrap;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+  .badge {
+    background: var(--surface2);
+    color: var(--muted);
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-weight: 600;
+  }
+  .tab-btn.active .badge {
+    background: rgba(0,200,255,0.15);
+    color: var(--accent);
+  }
+
+  /* PANELS */
+  .panel { display: none; padding: 24px 28px; }
+  .panel.active { display: block; }
+
+  /* STAT CARDS */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .stat-card.blue::before { background: var(--accent); }
+  .stat-card.red::before { background: var(--accent2); }
+  .stat-card.yellow::before { background: var(--accent3); }
+  .stat-card.green::before { background: var(--accent4); }
+  .stat-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .stat-value {
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .stat-sub {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .stat-card.blue .stat-value { color: var(--accent); }
+  .stat-card.red .stat-value { color: var(--accent2); }
+  .stat-card.yellow .stat-value { color: var(--accent3); }
+  .stat-card.green .stat-value { color: var(--accent4); }
+
+  /* CHART GRID */
+  .chart-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 20px;
+    margin-bottom: 28px;
+  }
+  .chart-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .chart-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .chart-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+  .chart-wrap { position: relative; }
+
+  /* FLOW TABLE */
+  .flow-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .flow-table th {
+    text-align: left;
+    padding: 8px 12px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .flow-table td {
+    padding: 9px 12px;
+    border-bottom: 1px solid rgba(30,45,74,0.5);
+    vertical-align: middle;
+  }
+  .flow-table tr:last-child td { border-bottom: none; }
+  .flow-table tr:hover td { background: rgba(0,200,255,0.04); }
+  .route-from { color: var(--accent3); font-weight: 500; }
+  .route-arrow { color: var(--muted); margin: 0 4px; }
+  .route-to { color: var(--accent4); font-weight: 500; }
+  .bpd-bar-wrap { display: flex; align-items: center; gap: 8px; }
+  .bpd-bar {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--accent);
+    opacity: 0.7;
+  }
+  .bpd-val { font-weight: 600; color: var(--text); white-space: nowrap; }
+  .rank-num { color: var(--muted); font-size: 12px; width: 20px; }
+
+  /* MAP */
+  #map {
+    height: 420px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .vessel-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+  }
+  .vessel-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    border-left: 3px solid var(--accent2);
+  }
+  .vessel-card.navy { border-left-color: var(--accent3); }
+  .vessel-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+  .vessel-imo {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 10px;
+    font-family: monospace;
+  }
+  .vessel-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+  }
+  .meta-row {
+    display: flex;
+    justify-content: space-between;
+  }
+  .meta-key { color: var(--muted); }
+  .meta-val { color: var(--text); font-weight: 500; }
+  .meta-val.danger { color: var(--accent2); }
+  .meta-val.coords { font-family: monospace; font-size: 11px; color: var(--accent); }
+  .days-badge {
+    display: inline-block;
+    background: rgba(255,82,82,0.15);
+    color: var(--accent2);
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 4px;
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .section-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .section-count {
+    font-size: 12px;
+    color: var(--muted);
+    background: var(--surface2);
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+
+  /* SANCTIONED TABLE */
+  .table-controls {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .search-box {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 14px;
+    color: var(--text);
+    font-size: 13px;
+    width: 280px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .search-box::placeholder { color: var(--muted); }
+  .search-box:focus { border-color: var(--accent); }
+  .filter-select {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 12px;
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+    min-width: 140px;
+  }
+  .filter-select:focus { border-color: var(--accent); }
+  .table-meta {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .data-table-wrap {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .data-table-scroll {
+    overflow-x: auto;
+    max-height: 620px;
+    overflow-y: auto;
+  }
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    min-width: 800px;
+  }
+  .data-table thead th {
+    background: var(--surface2);
+    padding: 11px 14px;
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+  }
+  .data-table thead th:hover { color: var(--accent); }
+  .data-table tbody tr {
+    border-bottom: 1px solid rgba(30,45,74,0.4);
+    transition: background 0.1s;
+  }
+  .data-table tbody tr:hover { background: rgba(0,200,255,0.04); }
+  .data-table td {
+    padding: 9px 14px;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  .imo { font-family: monospace; color: var(--muted); font-size: 12px; }
+  .vessel-link { color: var(--accent); font-weight: 600; text-decoration: none; }
+  .vessel-link:hover { text-decoration: underline; }
+  .flag-cell { display: flex; align-items: center; gap: 6px; }
+  .size-tag {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .size-vlcc { background: rgba(255,82,82,0.15); color: var(--accent2); }
+  .size-suezmax { background: rgba(255,209,102,0.15); color: var(--accent3); }
+  .size-aframax { background: rgba(0,200,255,0.15); color: var(--accent); }
+  .size-panamax { background: rgba(6,214,160,0.12); color: var(--accent4); }
+  .size-handy { background: rgba(100,116,139,0.2); color: var(--muted); }
+  .sanction-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent2);
+    vertical-align: middle;
+    margin-right: 4px;
+  }
+  .sanction-date { font-size: 11px; color: var(--accent2); font-weight: 500; }
+  .no-sanction { color: var(--border); font-size: 16px; }
+  .pagination {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    justify-content: flex-end;
+  }
+  .page-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 5px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.15s;
+  }
+  .page-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .page-btn.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 700; }
+  .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .page-info { font-size: 12px; color: var(--muted); }
+
+  /* SOURCE ATTRIBUTION */
+  .source-bar {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 24px;
+  }
+  .source-bar a { color: var(--accent); text-decoration: none; }
+  .source-bar a:hover { text-decoration: underline; }
+
+  /* Leaflet dark overrides */
+  .leaflet-container { background: #0a0e1a !important; }
+  .leaflet-tile { filter: brightness(0.5) saturate(0.8) hue-rotate(200deg); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--surface); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+  /* ── LIVE AIS ──────────────────────────────── */
+  .ais-layout {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    grid-template-rows: minmax(180px, 35%) 1fr;
+    gap: 16px;
+    height: calc(100vh - 162px);
+    
+  }
+  .ais-controls {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    grid-row: 1 / 3;
+    overflow-y: auto;
+  }
+  .ais-controls h3 {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .ais-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .ais-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 9px 11px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: monospace;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .ais-input:focus { border-color: var(--accent); }
+  .ais-input::placeholder { color: var(--muted); font-family: inherit; }
+  .region-list { display: flex; flex-direction: column; gap: 7px; }
+  .region-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 5px 8px;
+    border-radius: 6px;
+    transition: background 0.15s;
+  }
+  .region-check:hover { background: var(--surface2); }
+  .region-check input[type=checkbox] { accent-color: var(--accent); width: 14px; height: 14px; cursor: pointer; }
+  .connect-btn {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.3px;
+  }
+  .connect-btn.connect {
+    background: var(--accent4);
+    color: #000;
+  }
+  .connect-btn.connect:hover { background: #04c491; }
+  .connect-btn.disconnect {
+    background: rgba(255,82,82,0.15);
+    color: var(--accent2);
+    border: 1px solid var(--accent2);
+  }
+  .connect-btn.disconnect:hover { background: rgba(255,82,82,0.25); }
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border-radius: 7px;
+    background: var(--surface2);
+    font-size: 12px;
+  }
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .status-dot.disconnected { background: var(--muted); }
+  .status-dot.connecting { background: var(--accent3); animation: pulse 1s infinite; }
+  .status-dot.connected { background: var(--accent4); animation: pulse 2s infinite; }
+  .status-dot.error { background: var(--accent2); }
+  .ais-stat-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .ais-stat {
+    background: var(--surface2);
+    border-radius: 7px;
+    padding: 10px;
+    text-align: center;
+  }
+  .ais-stat-val { font-size: 22px; font-weight: 700; }
+  .ais-stat-val.blue { color: var(--accent); }
+  .ais-stat-val.red { color: var(--accent2); }
+  .ais-stat-val.green { color: var(--accent4); }
+  .ais-stat-lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+  .proxy-box {
+    background: rgba(255,209,102,0.07);
+    border: 1px solid rgba(255,209,102,0.25);
+    border-radius: 7px;
+    padding: 11px 12px;
+    font-size: 11px;
+    color: var(--accent3);
+    line-height: 1.5;
+  }
+  .proxy-box code {
+    display: block;
+    margin-top: 7px;
+    background: var(--bg);
+    padding: 5px 8px;
+    border-radius: 4px;
+    font-family: monospace;
+    color: var(--accent4);
+    font-size: 10px;
+    word-break: break-all;
+  }
+  .ais-feed-wrap {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .ais-feed-header {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .ais-feed-log {
+    flex: 1;
+    overflow-y: auto;
+    font-family: monospace;
+    font-size: 11px;
+    padding: 8px 0;
+  }
+  .feed-row {
+    padding: 4px 14px;
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    border-left: 2px solid transparent;
+    transition: background 0.1s;
+  }
+  .feed-row:hover { background: rgba(255,255,255,0.03); }
+  .feed-row.match {
+    background: rgba(255,82,82,0.07);
+    border-left-color: var(--accent2);
+  }
+  .feed-row.static {
+    border-left-color: rgba(0,200,255,0.3);
+  }
+  .feed-time { color: var(--muted); flex-shrink: 0; }
+  .feed-mmsi { color: var(--accent); flex-shrink: 0; min-width: 80px; }
+  .feed-name { color: var(--text); font-weight: 600; flex: 1; }
+  .feed-pos { color: var(--muted); flex-shrink: 0; }
+  .feed-sog { color: var(--accent4); flex-shrink: 0; }
+  .feed-match { color: var(--accent2); font-weight: 700; flex-shrink: 0; }
+  .feed-empty { padding: 24px; text-align: center; color: var(--muted); }
+  #liveMap {
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    flex: 1;
+    min-height: 0;
+  }
+  .map-legend {
+    display: flex;
+    gap: 16px;
+    font-size: 11px;
+    color: var(--muted);
+    padding: 8px 2px;
+    flex-shrink: 0;
+  }
+  .legend-dot {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+.refresh-badge{font-size:10px;color:var(--muted);font-family:monospace;margin-left:8px;opacity:.7}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🛢️</div>
+    <div>
+      <div class="logo-text">Tanker Tracker</div>
+      <div class="logo-sub">Shadow Fleet Intelligence Dashboard</div>
+    </div>
+  </div>
+  <div class="header-meta">
+    <div><span class="live-dot"></span>Data from TankerTrackers.com</div>
+    <div id="globalUpdated">Updated: <span id="globalUpdatedDate">fetching...</span></div>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="showTab('dark')">⚫ Dark Fleet <span class="badge">1,489</span></button>
+  <button class="tab-btn" onclick="showTab('lostandfound')">🔴 Lost &amp; Found <span class="badge">11</span></button>
+  <button class="tab-btn" onclick="showTab('sanctioned')">⚠️ Sanctioned <span class="badge">1,380</span></button>
+  <button class="tab-btn" onclick="showTab('live')">🛰️ Live AIS <span class="badge" id="liveTabBadge">—</span></button>
+</div>
+
+<!-- DARK FLEET PANEL -->
+<div id="panel-dark" class="panel active">
+  <div class="stat-grid">
+    <div class="stat-card blue">
+      <div class="stat-label">Active Dark Fleet Vessels</div>
+      <div class="stat-value">1,489</div>
+      <div class="stat-sub">Operating without transparency</div>
+    </div>
+    <div class="stat-card red">
+      <div class="stat-label">Iran → China Flow</div>
+      <div class="stat-value">1.63M</div>
+      <div class="stat-sub">barrels per day (365-day avg)</div>
+    </div>
+    <div class="stat-card yellow">
+      <div class="stat-label">Russia → China + India</div>
+      <div class="stat-value">1.90M</div>
+      <div class="stat-sub">bpd combined, past 365 days</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-label">Largest Flag State</div>
+      <div class="stat-value">Russia</div>
+      <div class="stat-sub">221 vessels registered</div>
+    </div>
+  </div>
+
+  <div class="chart-grid">
+    <div class="chart-card">
+      <div class="chart-title">Dark Fleet by Flag State</div>
+      <div class="chart-sub">Top 10 flag registries, active vessels</div>
+      <div class="chart-wrap"><canvas id="flagChart" height="280"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Vessel Size Breakdown</div>
+      <div class="chart-sub">By tanker class, 1,489 total</div>
+      <div class="chart-wrap"><canvas id="sizeChart" height="280"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Fleet Age Distribution</div>
+      <div class="chart-sub">Construction year, top 10 cohorts</div>
+      <div class="chart-wrap"><canvas id="ageChart" height="280"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Sanctioned Oil Flows</div>
+      <div class="chart-sub">Top routes by barrels/day, past 365 days</div>
+      <table class="flow-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Route</th>
+            <th>Barrels/Day</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="flowBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="source-bar">
+    Data source: <a href="https://tankertrackers.com/report/darkfleetinfo" target="_blank">tankertrackers.com/report/darkfleetinfo</a> —
+    The dark fleet consists of vessels that evade international sanctions by operating without standard transparency measures including AIS transmission, legitimate flag registration, and recognized insurance.
+  </div>
+</div>
+
+<!-- LOST & FOUND PANEL -->
+<div id="panel-lostandfound" class="panel">
+  <div id="map"></div>
+
+  <div class="section-header">
+    <div class="section-title">Taken Vessels</div>
+    <div class="section-count">5 vessels</div>
+  </div>
+  <div class="vessel-cards" id="takenCards"></div>
+
+  <div class="section-header" style="margin-top:28px;">
+    <div class="section-title">Iranian Navy Vessels</div>
+    <div class="section-count">6 vessels tracked</div>
+  </div>
+  <div class="vessel-cards" id="navyCards"></div>
+
+  <div class="source-bar" style="margin-top:24px;">
+    Data source: <a href="https://tankertrackers.com/report/lostandfound" target="_blank">tankertrackers.com/report/lostandfound</a> —
+    Vessels involuntarily taken by Iran or Houthi Rebels, plus Iranian navy vessels that appear frequently in the news. Coordinates updated daily.
+    Also available via <a href="https://tankertrackers.com/faq" target="_blank">public API</a> and CSV download.
+  </div>
+</div>
+
+<!-- LIVE AIS PANEL -->
+<div id="panel-live" class="panel">
+  <div class="ais-layout">
+
+    <!-- LEFT: Controls -->
+    <div class="ais-controls">
+      <h3>🛰️ Live AIS Feed</h3>
+
+      <div>
+        <div class="ais-label">Connection Mode</div>
+        <select class="filter-select" id="connMode" style="width:100%;" onchange="toggleConnMode()">
+          <option value="proxy">Local Proxy (recommended)</option>
+          <option value="direct">Direct WebSocket (may be blocked)</option>
+        </select>
+      </div>
+
+      <div id="proxyUrlWrap">
+        <div class="ais-label">Proxy URL</div>
+        <input class="ais-input" id="proxyUrl" value="ws://localhost:8765" placeholder="ws://localhost:8765">
+        <div class="proxy-box" style="margin-top:8px;">
+          Run proxy first:<code>pip3 install websockets
+python3 proxy.py --key YOUR_KEY</code>
+        </div>
+      </div>
+
+      <div id="directKeyWrap" style="display:none;">
+        <div class="ais-label">API Key</div>
+        <input class="ais-input" id="apiKeyInput" type="password" placeholder="aisstream.io API key">
+        <div class="proxy-box" style="margin-top:8px; border-color:rgba(255,82,82,0.3); color:var(--accent2);">
+          ⚠️ Direct mode exposes your API key. Use proxy for production. Get a key at <strong>aisstream.io</strong>
+        </div>
+      </div>
+
+      <div>
+        <div class="ais-label">Monitor Regions</div>
+        <div class="region-list" id="regionList"></div>
+      </div>
+
+      <button class="connect-btn connect" id="connectBtn" onclick="toggleConnect()">▶ Connect</button>
+
+      <div class="status-bar">
+        <div class="status-dot disconnected" id="statusDot"></div>
+        <span id="statusText" style="color:var(--muted);">Disconnected</span>
+      </div>
+
+      <div class="ais-stat-row">
+        <div class="ais-stat">
+          <div class="ais-stat-val blue" id="statVessels">0</div>
+          <div class="ais-stat-lbl">Vessels</div>
+        </div>
+        <div class="ais-stat">
+          <div class="ais-stat-val red" id="statMatches">0</div>
+          <div class="ais-stat-lbl">⚠️ Flagged</div>
+        </div>
+        <div class="ais-stat">
+          <div class="ais-stat-val green" id="statMsgs">0</div>
+          <div class="ais-stat-lbl">Total Msgs</div>
+        </div>
+        <div class="ais-stat">
+          <div class="ais-stat-val" style="color:var(--accent3);" id="statStatic">0</div>
+          <div class="ais-stat-lbl">IMO Checks</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="ais-label">Vessel Type Filter</div>
+        <select class="filter-select" id="typeFilter" style="width:100%;">
+          <option value="">All types</option>
+          <option value="80">Tankers (type 80-89)</option>
+          <option value="70">Cargo (type 70-79)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- RIGHT TOP: Feed Log -->
+    <div class="ais-feed-wrap">
+      <div class="ais-feed-header">
+        <span>Live Message Feed</span>
+        <button onclick="clearFeed()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;">Clear</button>
+      </div>
+      <div class="ais-feed-log" id="feedLog">
+        <div class="feed-empty">Connect to start receiving vessel positions...</div>
+      </div>
+    </div>
+
+    <!-- RIGHT BOTTOM: Map -->
+    <div style="display:flex;flex-direction:column;gap:8px;min-height:0;flex:1;">
+      <div class="map-legend">
+        <span><span class="legend-dot" style="background:#00c8ff;"></span>Unknown</span>
+        <span><span class="legend-dot" style="background:#ff5252;"></span>⚠️ Sanctioned match</span>
+        <span><span class="legend-dot" style="background:#ffd166;"></span>Dark fleet flag</span>
+        <span><span class="legend-dot" style="background:#06d6a0;"></span>Moving fast (>10kn)</span>
+      </div>
+      <div id="liveMap"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- SANCTIONED PANEL -->
+<div id="panel-sanctioned" class="panel">
+  <div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));">
+    <div class="stat-card red">
+      <div class="stat-label">Total Sanctioned</div>
+      <div class="stat-value">1,311</div>
+      <div class="stat-sub">+ 69 inactive</div>
+    </div>
+    <div class="stat-card blue">
+      <div class="stat-label">OFAC Sanctioned</div>
+      <div class="stat-value" id="ofacCount">—</div>
+      <div class="stat-sub">US Treasury</div>
+    </div>
+    <div class="stat-card yellow">
+      <div class="stat-label">EU Listed</div>
+      <div class="stat-value" id="euCount">—</div>
+      <div class="stat-sub">European Union</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-label">FCDO Listed</div>
+      <div class="stat-value" id="fcdoCount">—</div>
+      <div class="stat-sub">UK Gov</div>
+    </div>
+  </div>
+
+  <div class="table-controls">
+    <input class="search-box" type="text" id="searchInput" placeholder="🔍  Search vessel name or IMO..." oninput="filterTable()">
+    <select class="filter-select" id="sizeFilter" onchange="filterTable()">
+      <option value="">All sizes</option>
+      <option>VLCC/ULCC</option>
+      <option>Suezmax</option>
+      <option>Aframax</option>
+      <option>Panamax</option>
+      <option>Handysize/Handymax</option>
+    </select>
+    <select class="filter-select" id="flagFilter" onchange="filterTable()">
+      <option value="">All flags</option>
+    </select>
+    <select class="filter-select" id="sanctionFilter" onchange="filterTable()">
+      <option value="">All sanctions</option>
+      <option value="ofac">OFAC</option>
+      <option value="fcdo">FCDO (UK)</option>
+      <option value="uani">UANI</option>
+      <option value="eu">EU</option>
+    </select>
+    <div class="table-meta" id="tableCount"></div>
+  </div>
+
+  <div class="data-table-wrap">
+    <div class="data-table-scroll">
+      <table class="data-table" id="sanctionTable">
+        <thead>
+          <tr>
+            <th onclick="sortTable('name')">Vessel ↕</th>
+            <th onclick="sortTable('imo')">IMO</th>
+            <th onclick="sortTable('built')">Built ↕</th>
+            <th onclick="sortTable('size')">Class</th>
+            <th onclick="sortTable('flag')">Flag ↕</th>
+            <th onclick="sortTable('ofac')">OFAC</th>
+            <th onclick="sortTable('fcdo')">FCDO</th>
+            <th onclick="sortTable('uani')">UANI</th>
+            <th onclick="sortTable('eu')">EU</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+    <div class="pagination" id="pagination"></div>
+  </div>
+
+  <div class="source-bar">
+    Data source: <a href="https://tankertrackers.com/report/sanctioned" target="_blank">tankertrackers.com/report/sanctioned</a> —
+    Sanctioned by OFAC (US Treasury), FCDO (UK), UANI, EU, ASO, MFAT, GAC, SECO, and UN. Updated daily.
+    Available via <a href="https://tankertrackers.com/faq" target="_blank">API</a> and CSV.
+    Additional AIS data: <a href="https://aisstream.io" target="_blank">aisstream.io</a> · <a href="https://www.aishub.net" target="_blank">aishub.net</a>
+  </div>
+</div>
+
+<script>
+// ─── DATA ─────────────────────────────────────────────────────────────────────
+
+const DARK_FLAGS = [
+  ['Russia',221],['Panama',166],['Cameroon',160],['Sierra Leone',102],['Iran',89],
+  ['Comoros',62],['Curaçao',52],['Guyana',42],['Hong Kong',40],['Palau',38]
+];
+
+const DARK_SIZE = [
+  ['Handysize/Handymax',635],['Aframax',374],['VLCC/ULCC',229],['Suezmax',154],['Panamax',97]
+];
+
+const DARK_AGE = [
+  ['2003',158],['2005',146],['2004',142],['2006',121],['2002',98],
+  ['2007',92],['2008',88],['2000',78],['2009',72],['2001',64]
+];
+
+const FLOWS = [
+  {from:'Iran',to:'China',bpd:1630390},
+  {from:'Russia',to:'China',bpd:980549},
+  {from:'Russia',to:'India',bpd:919572},
+  {from:'Venezuela',to:'China',bpd:489041},
+  {from:'Russia',to:'Unknown',bpd:279753},
+  {from:'Iran',to:'UAE',bpd:105994},
+  {from:'Russia',to:'Turkey',bpd:86660},
+  {from:'Russia',to:'Syria',bpd:77598},
+  {from:'Saudi Arabia',to:'China',bpd:62104},
+  {from:'Saudi Arabia',to:'India',bpd:51664},
+];
+
+const TAKEN = [
+  {name:'ARIANA',imo:'9500132',taken:'2022-10-30',days:1263,lastSeen:'2026-04-07',lat:27.08415,lng:56.23071},
+  {name:'GALAXY LEADER',imo:'9237307',taken:'2023-11-19',days:878,lastSeen:'2026-04-14',lat:15.2356,lng:42.63673},
+  {name:'MAYUREE NAREE',imo:'9323649',taken:'2026-03-11',days:35,lastSeen:'2026-04-07',lat:26.89151,lng:56.16153},
+  {name:'MSC ARIES',imo:'9857169',taken:'2024-04-13',days:732,lastSeen:'2026-04-07',lat:27.05135,lng:56.14916},
+  {name:'REEM ALKHALEEJ',imo:'9401726',taken:'2025-12-25',days:111,lastSeen:'2026-02-26',lat:27.08763,lng:56.22364},
+];
+
+const NAVY = [
+  {name:'IRGC-N SHAHID BAGHERI',imo:'9209350',lastSeen:'2026-04-07',lat:27.03341,lng:56.07622},
+  {name:'IRIN KORDESTAN',imo:'8917467',lastSeen:'2026-04-07',lat:27.10848,lng:56.1958},
+  {name:'IRIS SHAHID MAHDAVI',imo:'9209348',lastSeen:'2026-04-07',lat:27.06478,lng:56.54335},
+  {name:'MAKRAN',imo:'9486910',lastSeen:'2026-04-07',lat:27.13271,lng:56.20707},
+  {name:'MENSAR',imo:'9167289',lastSeen:'2026-04-07',lat:27.08824,lng:56.21193},
+  {name:'SHAHID ROUDAKI',imo:'9048471',lastSeen:'2026-02-21',lat:27.1046,lng:56.18922},
+];
+
+const SANCTIONED_RAW = [["ABROS","9247388","2004","Handysize/Handymax","Curaçao","2024-10-17","","2024-10-31",""],["ACHILLES","9368223","2008","Aframax","Oman","","2025-02-24","","2025-07-20"],["ADARA","9251884","2004","Handysize/Handymax","Curaçao","2025-10-09","","",""],["ADELINE G","9234666","2003","VLCC/ULCC","Panama","2025-08-21","","2022-11-01",""],["ADENA","9254862","2003","Panamax","Hong Kong","2025-09-02","","",""],["ADHARA","9353125","2008","Handysize/Handymax","Sierra Leone","","2025-05-09","","2025-05-21"],["ADITYA","9203784","2000","Suezmax","Guyana","2024-11-14","","2025-04-30",""],["ADITYA","9323314","2006","Handysize/Handymax","Cameroon","","2026-02-24","","2025-10-24"],["ADMIRAL","9274446","2004","Suezmax","Russia","2024-01-18","2025-09-12","",""],["AEGIS","9275660","2004","Panamax","Syria","2025-05-13","","2025-03-31",""],["AETHER","9328170","2007","Aframax","Madagascar","2025-07-30","","",""],["AETHER SAIL","9277371","2003","Handysize/Handymax","Palau","2025-12-18","","",""],["AGATE","9310390","2006","Handysize/Handymax","Curaçao","2025-02-24","","2025-02-28",""],["AGENA","9257757","2003","Handysize/Handymax","Cameroon","","2025-05-09","","2025-05-21"],["AGENA STAR","9226844","2002","Aframax","Sierra Leone","","2025-05-09","","2025-07-20"],["AGNI","9193988","2000","Aframax","Comoros","2025-01-10","2025-07-21","2023-06-30","2025-05-21"],["AGUILAS DEL MAR","9250024","2002","VLCC/ULCC","Comoros","2025-03-13","","2021-01-29",""],["AHMED NADEEB","9333985","2007","Handysize/Handymax","Comoros","","","2023-04-28",""],["AIDA II","9242483","2002","Handysize/Handymax","Comoros","","","2021-07-30",""],["AINGEAL","9270397","2004","Aframax","Sierra Leone","","2025-05-09","","2025-05-21"],["AIRLIE","9248399","2003","Handysize/Handymax","Barbados","","2025-05-09","2024-01-31","2025-05-21"],["AITOLIKOS","9280239","2003","Aframax","Comoros","","","2022-06-30",""],["AL KAWTHAR","9246463","2003","Handysize/Handymax","Iran","","","2020-04-03",""],["AL RAWDAH","9186748","1999","Handysize/Handymax","Comoros","","","2020-11-12",""],["ALAID","9253677","2003","Aframax","Russia","2024-08-12","2025-09-12","","2025-05-21"],["ALBEDO","9300395","2005","Aframax","Russia","2024-01-18","2025-09-12","","2025-05-21"],["ALBORAN SEA","9230783","2001","Suezmax","Guyana","2025-12-23","","2022-09-30",""],["ALCO STAR","9356087","2007","Suezmax","Sierra Leone","","2025-05-09","","2025-05-21"],["ALCOR","9214636","2000","Aframax","Russia","2024-01-18","2025-09-12","",""],["ALCYONE","9308659","2005","Suezmax","Curaçao","","2025-07-21","2023-01-31","2025-05-21"],["ALDEBARAN","9230795","2001","Suezmax","Russia","2024-06-12","2025-09-12","","2025-10-24"],["ALDGATE","9166663","1998","VLCC/ULCC","Honduras","2024-12-03","","2022-11-01",""],["ALECTO","9214210","2000","Aframax","Curaçao","","2025-07-21","2021-05-28","2025-05-21"],["ALETAI","9346963","2008","Suezmax","Panama","","","2024-08-30",""],["ALEX","9270361","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["ALFA","9341419","2007","Aframax","Syria","2025-05-09","","2021-07-02",""],["ALFREDA","9326069","2007","Handysize/Handymax","Cameroon","","2026-02-24","","2025-10-24"],["ALGA","9174289","1999","Aframax","Russia","2024-06-12","2025-09-12","",""],["ALGECIRAS","9185300","1999","Aframax","Barbados","","2025-05-09","2021-09-30","2025-05-21"],["ALIANZA","9292654","2005","Aframax","Comoros","","","2021-07-30",""],["ALIZE","9247352","2002","Handysize/Handymax","Hong Kong","","","2020-11-12",""],["ALKES","9275672","2004","Panamax","Russia","2025-01-14","2025-09-12","","2025-05-21"],["ALKYONE","9325376","2007","Aframax","Barbados","","2025-05-09","","2025-05-21"],["ALLA","9292448","2005","Handysize/Handymax","Tuvalu","","","2020-11-12",""],["ALLAY","9252034","2003","Aframax","Comoros","","","2020-04-03",""],["ALLEGRO","9283879","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["ALLURE","9224680","2001","Handysize/Handymax","Comoros","","","2022-01-13",""],["ALMA","9271738","2004","Aframax","Russia","2024-01-18","2025-09-12","","2025-10-24"],["ALMERIA","9260963","2004","Aframax","Russia","2024-06-12","2025-09-12","","2025-10-24"],["ALMON","9361083","2009","Aframax","Comoros","","2025-05-09","","2025-05-21"],["ALNAHYAN","9246061","2002","Handysize/Handymax","Comoros","","","2019-11-05",""],["ALPHA","9347437","2008","Suezmax","Sierra Leone","","2025-05-09","","2025-07-20"],["ALROSA","9196900","2000","Aframax","Russia","2024-01-18","2025-09-12","",""],["ALTAIR","9230757","2001","Suezmax","Russia","2024-06-12","2025-09-12","","2025-05-21"],["ALTAMIRA","9328194","2007","Aframax","Sierra Leone","","2025-05-09","","2025-05-21"],["ALTAY","9273020","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["ALTIUS","9261488","2004","Handysize/Handymax","Barbados","","2025-05-09","2024-01-31","2025-05-21"],["ALTONA","9278677","2004","Aframax","Russia","2025-02-18","2025-09-12","","2025-05-21"],["ALYA","9302095","2005","Suezmax","Russia","2024-06-12","2025-09-12","","2025-05-21"],["ALYONA","9311875","2006","Aframax","Russia","2024-01-18","2025-09-12","",""],["AMAK","9248375","2003","Handysize/Handymax","Aruba","","2025-05-09","2024-01-31","2025-05-21"],["AMALI","9261749","2004","Aframax","Cameroon","","2025-02-24","","2025-05-21"],["AMASIA","9383760","2009","Aframax","Russia","2024-01-18","2025-09-12","",""],["AMBITION","9323740","2007","Suezmax","Russia","2024-06-12","2025-09-12","",""],["AMELIA","9196365","2000","Handysize/Handymax","Comoros","","","2020-11-12",""],["AMETHYST","9328065","2007","Aframax","Russia","2024-01-18","2025-09-12","",""],["AMGUEMA","9196454","2000","Aframax","Russia","2024-01-18","2025-09-12","","2025-05-21"],["AMIDE","9293220","2005","Handysize/Handymax","Comoros","","","2020-11-12",""],["AMIGOS","9260443","2003","Handysize/Handymax","Comoros","","","2021-01-29",""],["AMINA","9256183","2003","Aframax","Comoros","","","2020-04-03",""],["AMIR","9216025","2001","Handysize/Handymax","Comoros","","","2020-04-03",""],["AMIRA","9218259","2001","Handysize/Handymax","Comoros","","","2020-04-03",""],["AMOS","9232753","2002","Handysize/Handymax","Comoros","","","2021-01-29",""],["AMUR","9191292","2000","Aframax","Russia","2024-01-18","2025-09-12","","2025-10-24"],["AN SHUN","9342155","2007","VLCC/ULCC","Liberia","","","2024-04-30",""],["ANASTASIA","9295268","2005","Aframax","Comoros","","","2021-01-29",""],["ANCO SPIRIT","9254616","2003","Aframax","Palau","","2025-05-09","","2025-05-21"],["ANDAMAN SEA","9225983","2002","Suezmax","Comoros","","","2022-09-30",""],["ANDEAN MARVEL","9291507","2005","VLCC/ULCC","Comoros","2025-03-13","","2021-01-29",""],["ANDEAN SAPPHIRE","9163956","1997","VLCC/ULCC","Comoros","2025-05-23","","2022-09-30",""],["ANDIJANO","9197741","2001","Aframax","Russia","2024-01-18","2025-09-12","",""],["ANDOR","9331226","2007","Aframax","Comoros","","2025-05-09","","2025-05-21"],["ANGEL","9339815","2007","Aframax","Cameroon","","2025-02-24","","2025-10-24"],["ANGELINA","9278641","2004","Aframax","Russia","2024-01-18","2025-09-12","","2025-10-24"],["ANGLIA","9262843","2003","Aframax","Russia","2024-01-18","2025-09-12","",""],["ANGOLA SPIRIT","9241001","2002","VLCC/ULCC","Cameroon","2025-05-08","","2022-09-30","2025-05-21"],["ANNA","9271740","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["ANNA K","9301585","2005","Handysize/Handymax","Comoros","","","2023-04-28",""],["ANNABEL","9323467","2006","Aframax","Sierra Leone","","2025-07-21","","2025-05-21"],["ANPHITRITI","9224277","2001","Aframax","Comoros","","","2020-04-03",""],["ANTARES","9342842","2007","Suezmax","Cameroon","","2025-02-24","","2025-05-21"],["ANTILA","9326162","2007","Aframax","Russia","2025-01-14","2025-09-12","","2025-05-21"],["ANTONINA NEZHDANOVA","9310285","2006","Aframax","Russia","2024-01-18","2025-09-12","",""],["ANZHELA CHAMPION","9200994","2001","Aframax","Russia","2025-01-14","2025-09-12","",""],["APEIRON","9260923","2003","Aframax","Comoros","","","2020-04-03",""],["APOLLO","9340769","2007","Aframax","Sierra Leone","","2025-05-09","","2025-07-20"],["AQUARIUS","9311887","2007","Aframax","Russia","2024-06-12","2025-09-12","","2025-10-24"],["AQUATINE","9348497","2009","Aframax","Cameroon","","2025-02-24","","2025-05-21"],["AQUILA","9319213","2007","Aframax","Curaçao","","2025-07-21","2024-01-31","2025-05-21"],["ARAKS","9191280","2000","Aframax","Russia","2024-01-18","2025-09-12","",""],["ARALKUM","9197728","2001","Aframax","Russia","2024-01-18","2025-09-12","",""],["ARAN","9293177","2005","Handysize/Handymax","Comoros","","","2022-06-30",""],["ARANDO","9389832","2009","Aframax","Russia","2024-01-18","2025-09-12","",""],["ARAR","9244513","2002","Handysize/Handymax","Iran","","","2020-04-03",""],["ARCADIA","9289718","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["ARCHANGEL","9257526","2003","VLCC/ULCC","Palau","2025-03-06","","2022-11-01",""],["ARCTIC","9332009","2007","Aframax","Russia","2024-01-18","2025-09-12","",""],["ARCTIC LADY","9232181","2003","Aframax","Comoros","","","2022-09-30",""],["ARCTIC VOYAGER","9190698","2000","Aframax","Barbados","","2025-05-09","2021-09-30","2025-05-21"],["ARDA","9307193","2005","Handysize/Handymax","Comoros","","","2020-04-03",""],["ARDMORE ENCOUNTER","9484023","2011","Handysize/Handymax","Comoros","","","2024-07-31",""],["ARDMORE ESQUIRE","9538394","2012","Handysize/Handymax","Comoros","","","2024-07-31",""],["ARDMORE EXPORTER","9538382","2012","Handysize/Handymax","Comoros","","","2024-07-31",""],["AREA","9344001","2007","Aframax","Russia","2024-01-18","2025-09-12","","2025-10-24"],["ARELI","9227720","2002","Handysize/Handymax","Comoros","","","2020-11-12",""],["ARES","9256430","2003","Aframax","Russia","2024-01-18","2025-09-12","",""],["ARETHUSA","9307207","2005","Handysize/Handymax","Comoros","","","2021-07-30",""],["ARGOS","9389844","2009","Aframax","Russia","2024-01-18","2025-09-12","",""],["ARIA","9225751","2002","Aframax","Russia","2024-01-18","2025-09-12","",""],["ARIADNE","9231997","2001","Aframax","Russia","2024-06-12","2025-09-12","",""],["ARION","9376956","2007","Aframax","Russia","2024-01-18","2025-09-12","",""],["ARISTOTLE","9228576","2002","Aframax","Comoros","","","2021-07-30",""],["ARKADIA","9208912","2001","Aframax","Russia","2024-06-12","2025-09-12","",""],["ARKTIKA","9254537","2003","Aframax","Russia","2024-01-18","2025-09-12","",""],["ARKTIS DAWN","9389662","2010","Handysize/Handymax","Comoros","","","2024-07-31",""],["ARMAN","9259303","2004","Aframax","Russia","2025-01-14","2025-09-12","","2025-05-21"],["ARMO","9263055","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["ARNI","9379548","2009","Handysize/Handymax","Comoros","","","2022-01-13",""],["AROSA","9274202","2004","Aframax","Comoros","","","2021-07-30",""],["ARROYO","9349477","2009","Handysize/Handymax","Comoros","","","2020-04-03",""],["ARSIA","9264255","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["ARTIC","9332011","2007","Aframax","Russia","2024-06-12","2025-09-12","",""],["ARTIO","9314661","2006","Aframax","Russia","2025-01-14","2025-09-12","",""],["ARUNA","9251492","2002","Handysize/Handymax","Comoros","","","2020-04-03",""],["ARUNGGA","9266476","2004","Aframax","Comoros","","","2021-07-30",""],["ARZU","9263511","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["ASAPH","9249990","2002","Handysize/Handymax","Comoros","","","2021-01-29",""],["ASCELLA","9305697","2006","Aframax","Russia","2024-01-18","2025-09-12","",""],["ASCENDANT","9299966","2006","Suezmax","Russia","2024-01-18","2025-09-12","",""],["ASFALT","9393012","2009","Handysize/Handymax","Russia","2025-01-14","2025-09-12","",""],["ASGARD","9260248","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["ASGARD SEA","9218637","2001","Aframax","Comoros","","","2020-04-03",""],["ASHA","9325819","2007","Aframax","Comoros","","","2023-01-31",""],["ASHITA","9248880","2003","Aframax","Russia","2024-01-18","2025-09-12","",""],["ASILAH","9327152","2007","Aframax","Russia","2024-01-18","2025-09-12","",""],["ASKAR","9395521","2010","Aframax","Russia","2024-06-12","2025-09-12","",""],["ASLAN","9255412","2003","Aframax","Russia","2024-01-18","2025-09-12","",""],["ASPADANA","9182783","1999","Handysize/Handymax","Comoros","","","2020-04-03",""],["ASPEN","9244083","2002","Aframax","Russia","2024-01-18","2025-09-12","",""],["ASPHALION","9277151","2004","Aframax","Comoros","","","2021-07-30",""],["ASPIS","9293219","2005","Handysize/Handymax","Cameroon","","2025-05-09","","2025-05-21"],["ASSID","9265826","2004","Handysize/Handymax","Comoros","","","2021-01-29",""],["ASTER","9266014","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["ASTORIA","9320207","2006","Aframax","Russia","2024-01-18","2025-09-12","",""],["ASTRA","9313667","2006","Aframax","Russia","2024-01-18","2025-09-12","","2025-05-21"],["ASTRAL","9358756","2007","Aframax","Russia","2024-06-12","2025-09-12","",""],["ASTRID","9263834","2004","Aframax","Russia","2024-06-12","2025-09-12","","2025-10-24"],["ATALANTA","9327905","2006","Aframax","Russia","2024-01-18","2025-09-12","",""],["ATAN","9289627","2005","Handysize/Handymax","Russia","2025-12-17","","",""],["ATENA","9342076","2009","Suezmax","Cameroon","","2024-12-17","","2025-05-21"],["ATHELSTANE","9302988","2006","Aframax","Russia","2024-01-18","2025-09-12","",""],["ATHENS","9231985","2002","Aframax","Russia","2024-06-12","2025-09-12","","2025-05-21"],["ATHOS","9393024","2009","Handysize/Handymax","Russia","2025-01-14","2025-09-12","",""],["ATHOS I","9167940","1998","Aframax","Comoros","","","2021-01-29",""],["ATLAS","9248983","2002","Panamax","Iran","","","2019-11-05",""],["ATLASOVО","9265218","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["ATOKA","9248363","2003","Handysize/Handymax","Comoros","","","2021-01-29",""],["ATRIA","9355440","2007","Suezmax","Russia","2024-06-12","2025-09-12","","2025-05-21"],["ATTIS","9228784","2002","Handysize/Handymax","Comoros","","","2021-01-29",""],["AVANTAGE","9253689","2003","Aframax","Comoros","","","2021-01-29",""],["AVES","9319470","2007","Aframax","Russia","2024-01-18","2025-09-12","",""],["AVIOR","9281097","2004","Suezmax","Russia","2024-06-12","2025-09-12","","2025-05-21"],["AVLONA","9267988","2004","Aframax","Comoros","","","2021-07-30",""],["AVONDALE","9241596","2002","Aframax","Russia","2024-01-18","2025-09-12","",""],["AYALON","9195498","2000","Handysize/Handymax","Comoros","","","2020-11-12",""],["AYAT","9209011","2001","Handysize/Handymax","Iran","","","2022-05-01",""],["AYAT SPIRIT","9218558","2001","VLCC/ULCC","Iran","","","2012-03-30",""],["AZALEA","9289627","2005","Handysize/Handymax","Russia","2025-01-14","2025-09-12","",""],["AZIMUTH","9290714","2005","Aframax","Russia","2025-01-14","2025-09-12","",""],["AZOFF","9278665","2004","Aframax","Russia","2024-06-12","2025-09-12","","2025-05-21"],["AZORA","9303906","2006","Aframax","Russia","2024-01-18","2025-09-12","",""],["AZTECA","9249239","2003","Handysize/Handymax","Comoros","","","2021-01-29",""],["AZUL","9347734","2007","Suezmax","Russia","2024-06-12","2025-09-12","","2025-10-24"],["AZUMA","9284572","2004","Aframax","Russia","2024-06-12","2025-09-12","",""],["BABIY YAR","9311928","2007","Aframax","Russia","2025-09-12","2025-09-12","","2025-10-24"],["BADR","9248539","2003","Handysize/Handymax","Iran","","","2020-04-03",""],["BAFFINLAND","9327164","2007","Aframax","Comoros","","","2020-04-03",""],["BAHRAM","9271621","2004","Handysize/Handymax","Comoros","","","2020-04-03",""],["BAIKAL","9329118","2006","Aframax","Russia","2024-01-18","2025-09-12","",""],["BAIRD","9332035","2007","Aframax","Russia","2024-01-18","2025-09-12","",""],["BAKU","9225428","2002","Aframax","Russia","2024-01-18","2025-09-12","","2025-05-21"],["BALI SEA","9261208","2004","Aframax","Comoros","","","2020-04-03",""],["BALKASH","9252757","2003","Aframax","Russia","2024-01-18","2025-09-12","","2025-05-21"],["BALMORAL HEAD","9167952","1999","Aframax","Comoros","","","2022-09-30",""],["BALSAS","9327176","2007","Aframax","Russia","2024-01-18","2025-09-12","",""],["BALTIC","9225404","2002","Aframax","Russia","2024-01-18","2025-09-12","",""],["BALTIKA","9207879","2001","Aframax","Russia","2025-01-14","2025-09-12","",""],["BALTIYSK","9236494","2003","Aframax","Russia","2024-01-18","2025-09-12","",""],["BAN CHIANG","9179700","1999","Aframax","Comoros","","","2020-04-03",""],["BANDAR DEYLAM","9193484","2000","Handysize/Handymax","Iran","","","2019-11-05",""],["BANDAR IMAM KHOMEINI","9106413","1994","VLCC/ULCC","Iran","","","2012-03-30",""],["BANDAR MAHSHAHR","9218558","2001","VLCC/ULCC","Iran","","","2012-03-30",""],["BAODHI","9276963","2004","VLCC/ULCC","Hong Kong","","","2024-06-28",""],["BAR","9290702","2005","Aframax","Russia","2025-01-14","2025-09-12","",""],["BARAJ","9302976","2006","Aframax","Russia","2024-06-12","2025-09-12","","2025-10-24"],["BARAKA","9303191","2006","Aframax","Russia","2024-01-18","2025-09-12","",""],["BARAN","9263781","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["BARKA","9303360","2005","Aframax","Russia","2024-01-18","2025-09-12","",""],["BARN OWL","9356831","2008","Suezmax","Curaçao","","2025-07-21","2022-09-30","2025-05-21"],["BARON","9267677","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["BASANTA","9209984","2001","Handysize/Handymax","Comoros","","","2020-11-12",""],["BASNA","9303344","2005","Aframax","Russia","2024-01-18","2025-09-12","",""],["BASSAS DA INDIA","9262788","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["BATILLUS","9308209","2005","Aframax","Russia","2024-01-18","2025-09-12","",""],["BATURIN","9250498","2003","Aframax","Russia","2024-01-18","2025-09-12","",""],["BAYAN","9298337","2005","Handysize/Handymax","Comoros","","","2020-11-12",""],["BAYOU SPIRIT","9197753","2001","Aframax","Russia","2024-01-18","2025-09-12","",""],["BAZIYAH","9302083","2005","Suezmax","Russia","2024-06-12","2025-09-12","",""],["BECQUEREL","9269477","2004","Aframax","Russia","2024-01-18","2025-09-12","","2025-05-21"],["BEDOUIN","9230769","2001","Suezmax","Russia","2024-06-12","2025-09-12","","2025-05-21"],["BELAIA","9399823","2010","Aframax","Russia","2025-01-14","2025-09-12","","2025-10-24"],["BELENUS","9393541","2008","Suezmax","Russia","2024-01-18","2025-09-12","",""],["BELGRADE","9289603","2005","Aframax","Russia","2024-01-18","2025-09-12","",""],["BELLA","9295386","2005","Suezmax","Russia","2024-06-12","2025-09-12","","2025-05-21"],["BELLONA","9328663","2006","Aframax","Russia","2024-01-18","2025-09-12","",""],["BENI SUEF","9253227","2003","Handysize/Handymax","Comoros","","","2021-01-29",""],["BENIYAR","9279941","2004","Aframax","Russia","2024-06-12","2025-09-12","",""],["BEOGRAD","9289591","2005","Aframax","Russia","2024-01-18","2025-09-12","",""],["BERING","9244538","2002","Aframax","Russia","2024-06-12","2025-09-12","","2025-10-24"],["BERKUT","9265814","2004","Aframax","Russia","2024-06-12","2025-09-12","",""],["BEROUNKA","9265474","2004","Aframax","Russia","2024-06-12","2025-09-12","","2025-10-24"],["BERYL","9290143","2005","Aframax","Russia","2024-01-18","2025-09-12","",""],["BESS","9284948","2005","Aframax","Russia","2024-01-18","2025-09-12","",""],["BEWA","9328651","2006","Aframax","Russia","2024-01-18","2025-09-12","",""],["BIGA","9284960","2005","Aframax","Russia","2024-06-12","2025-09-12","","2025-10-24"],["BILBERRY","9296547","2006","Handysize/Handymax","Comoros","","","2021-01-29",""],["BINAH","9266374","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["BINGOL","9278689","2004","Aframax","Russia","2024-06-12","2025-09-12","","2025-05-21"],["BIRYUSA","9264267","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["BITON","9377068","2007","Suezmax","Russia","2024-01-18","2025-09-12","","2025-10-24"],["BLACKOUT","9346354","2008","Suezmax","Cameroon","","2025-02-24","","2025-05-21"],["BLIZZARD","9299370","2005","Aframax","Russia","2024-01-18","2025-09-12","",""],["BLUE AEGEAN","9259157","2004","Aframax","Comoros","","","2022-06-30",""],["BLUE COAST","9255989","2004","Aframax","Comoros","","","2022-06-30",""],["BOHAI GLORY","9270999","2004","Suezmax","China","","","2024-04-30",""],["BOHAI PEARL","9273576","2004","Suezmax","China","","","2024-04-30",""],["BOHAI SPIRIT","9298609","2005","Suezmax","China","","","2024-04-30",""],["BOHAI SUN","9258429","2004","Suezmax","China","","","2024-04-30",""],["BOHAI VENTURE","9209958","2001","Suezmax","China","","","2024-04-30",""],["BORGU","9280976","2004","Aframax","Russia","2024-06-12","2025-09-12","",""],["BORICA","9316023","2006","Handysize/Handymax","Cameroon","","2025-05-09","","2025-05-21"],["BOSPHORUS","9266439","2004","Aframax","Russia","2024-06-12","2025-09-12","","2025-05-21"],["BOSTAMABAD","9186931","2000","Handysize/Handymax","Iran","","","2019-11-05",""],["BOTANIK","9315613","2007","Aframax","Russia","2024-01-18","2025-09-12","",""],["BOYANA","9289615","2005","Aframax","Russia","2024-06-12","2025-09-12","","2025-05-21"],["BRAVE MARINER","9340277","2007","VLCC/ULCC","Cameroon","2025-05-08","","2022-09-30","2025-05-21"],["BRAVA LAKE","9258388","2003","Aframax","Comoros","","","2022-09-30",""],["BRAZIL","9346887","2008","Suezmax","Sierra Leone","","2025-05-09","","2025-07-20"],["BREMER","9303904","2006","Aframax","Russia","2024-01-18","2025-09-12","",""],["BRENTA","9315650","2007","Aframax","Russia","2024-06-12","2025-09-12","","2025-10-24"],["BRISE","9315601","2007","Aframax","Russia","2024-06-12","2025-09-12","",""],["BROVIG BREEZE","9238499","2002","Handysize/Handymax","Comoros","","","2021-01-29",""],["BROVIG BRIS","9238501","2002","Handysize/Handymax","Comoros","","","2021-01-29",""],["BRUNHILDE","9368661","2008","Suezmax","Russia","2024-01-18","2025-09-12","",""],["BUENA SUERTE","9316035","2006","Handysize/Handymax","Cameroon","","2025-05-09","","2025-05-21"],["BUKET","9368685","2009","Suezmax","Russia","2024-01-18","2025-09-12","","2025-10-24"],["BURAK","9363268","2008","Suezmax","Russia","2024-01-18","2025-09-12","",""],["BUYAN","9298313","2005","Handysize/Handymax","Russia","2025-01-14","2025-09-12","",""],["CADIZ","9265268","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["CALEDONIA","9316875","2006","Aframax","Russia","2025-01-14","2025-09-12","","2025-05-21"],["CALLISTO","9238888","2003","Aframax","Russia","2024-06-12","2025-09-12","","2025-10-24"],["CAMELLIA","9329716","2006","Suezmax","Russia","2024-01-18","2025-09-12","",""],["CANAVERAL","9275684","2004","Panamax","Russia","2025-09-05","2025-09-12","","2025-10-24"],["CANOPUS","9327917","2006","Aframax","Russia","2024-01-18","2025-09-12","","2025-05-21"],["CAPELLA","9325388","2007","Aframax","Russia","2024-01-18","2025-09-12","","2025-10-24"],["CAPTAIN","9302006","2005","Aframax","Russia","2024-01-18","2025-09-12","",""],["CARLITA","9323455","2006","Aframax","Sierra Leone","","2025-07-21","","2025-05-21"],["CARLOTTA","9332023","2007","Aframax","Russia","2024-01-18","2025-09-12","",""],["CASCADE","9286124","2005","Aframax","Russia","2024-01-18","2025-09-12","",""],["CASPIAN","9225868","2002","Aframax","Russia","2024-01-18","2025-09-12","",""],["CASTOR","9270374","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["CAVALIER","9339645","2007","Handysize/Handymax","Cameroon","","2025-05-09","","2025-05-21"],["CEDAR","9263201","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["CELESTINE","9269518","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["CELINA","9289483","2005","Aframax","Russia","2024-01-18","2025-09-12","",""],["CELSIUS","9345494","2007","Aframax","Barbados","","2025-05-09","2024-01-31","2025-05-21"],["CEPHEUS","9297783","2005","Aframax","Russia","2024-01-18","2025-09-12","",""],["CESAR","9262465","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["CESARO","9260936","2003","Aframax","Comoros","","","2021-01-29",""],["CETO","9376944","2007","Aframax","Russia","2024-06-12","2025-09-12","",""],["CHALEUR","9251881","2003","Aframax","Russia","2024-01-18","2025-09-12","",""],["CHANDA","9329297","2006","Handysize/Handymax","Russia","2025-01-14","2025-09-12","",""],["CHANG AN CHENG","9363816","2009","VLCC/ULCC","China","","","2024-04-30",""],["CHANG MING","9316916","2007","VLCC/ULCC","China","","","2024-04-30",""],["CHANG SHENG","9270765","2003","VLCC/ULCC","China","","","2024-04-30",""],["CHANG SHUN","9318019","2007","VLCC/ULCC","China","","","2024-04-30",""],["CHAOS","9299382","2005","Aframax","Russia","2024-01-18","2025-09-12","",""],["CHARITY","9258442","2004","Aframax","Russia","2025-01-14","2025-09-12","","2025-05-21"],["CHARIZMA","9294535","2005","Aframax","Russia","2024-01-18","2025-09-12","",""],["CHARLIE","9296468","2005","Aframax","Russia","2024-06-12","2025-09-12","",""],["CHARLOTTE","9329704","2006","Suezmax","Russia","2024-01-18","2025-09-12","","2025-10-24"],["CHAYKA","9290131","2005","Aframax","Russia","2024-01-18","2025-09-12","",""],["CHELKAR","9258431","2004","Aframax","Russia","2024-06-12","2025-09-12","",""],["CHELNY","9262453","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["CHEREMSHAN","9303930","2006","Aframax","Russia","2024-01-18","2025-09-12","",""],["CHERNOMORETS","9298325","2005","Handysize/Handymax","Russia","2025-01-14","2025-09-12","",""],["CHITA","9267638","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["CHRISTA","9283842","2005","Aframax","Russia","2024-01-18","2025-09-12","",""],["CHRISTOPH DEITERS","9291975","2006","Handysize/Handymax","Comoros","","","2024-01-31",""],["CIENCIA","9296262","2005","Aframax","Russia","2024-01-18","2025-09-12","",""],["CIUDAD DE MANTA","9204218","2001","Handysize/Handymax","Comoros","","","2021-01-29",""],["CLARO","9314497","2006","Aframax","Russia","2024-06-12","2025-09-12","",""],["CLASSICA","9280471","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["CLIO","9254989","2003","Aframax","Russia","2024-01-18","2025-09-12","",""],["CLONARD","9373286","2009","Handysize/Handymax","Comoros","","","2024-01-31",""],["CLOUD ATLAS","9222244","2001","VLCC/ULCC","Comoros","2025-03-13","","2021-01-29",""],["COBALT","9302150","2005","Aframax","Russia","2024-01-18","2025-09-12","",""],["COLORADO","9291521","2005","VLCC/ULCC","Comoros","2025-03-13","","2021-01-29",""],["COLUMBIA","9296078","2005","Aframax","Russia","2024-01-18","2025-09-12","",""],["COMOROS VISION","9241415","2002","Aframax","Comoros","","","2020-04-03",""],["CONCORDIA","9272066","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["CONNECT","9280483","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["CONSTANTINE","9330120","2007","Aframax","Russia","2024-01-18","2025-09-12","",""],["CONSTELLATION","9358847","2007","Aframax","Russia","2024-01-18","2025-09-12","",""],["CONSUL","9262477","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["CONSUL PISAREV","9200658","2001","Aframax","Russia","2025-01-14","2025-09-12","",""],["CONTESSA","9284948","2005","Aframax","Russia","2024-01-18","2025-09-12","",""],["CORAL","9263019","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["CORDELIA","9339621","2007","Handysize/Handymax","Cameroon","","2025-05-09","","2025-05-21"],["CORFU","9276987","2004","Aframax","Russia","2024-06-12","2025-09-12","","2025-10-24"],["CORONA","9346548","2008","Suezmax","Russia","2024-01-18","2025-09-12","",""],["CORSAIR","9323390","2007","Aframax","Russia","2024-01-18","2025-09-12","",""],["COSMOS","9290155","2005","Aframax","Russia","2024-01-18","2025-09-12","",""],["COSSACK","9286630","2005","Aframax","Russia","2024-01-18","2025-09-12","",""],["COTOPAXI","9328170","2007","Aframax","Madagascar","2025-07-30","","",""],["COUPE","9286100","2005","Aframax","Russia","2024-01-18","2025-09-12","",""],["CRESSIDA","9329700","2006","Suezmax","Russia","2024-01-18","2025-09-12","","2025-05-21"],["CRUX","9329651","2006","Aframax","Russia","2024-01-18","2025-09-12","",""],["CSILLA","9253136","2003","Handysize/Handymax","Barbados","","2025-05-09","2024-01-31","2025-05-21"],["CUBA","9315661","2007","Aframax","Russia","2024-01-18","2025-09-12","",""],["CURIE","9278069","2004","Aframax","Russia","2024-01-18","2025-09-12","",""],["CYGNUS","9303588","2005","Aframax","Russia","2024-01-18","2025-09-12","",""]];
+
+// ─── TAB SWITCHER ─────────────────────────────────────────────────────────────
+function showTab(id) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + id).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (id === 'lostandfound' && !mapInitialized) initMap();
+  if (id === 'live') { initLiveMap(); setTimeout(() => liveMap?.invalidateSize(), 50); }
+}
+
+// ─── DARK FLEET CHARTS ────────────────────────────────────────────────────────
+const CHART_COLORS = ['#00c8ff','#ff5252','#ffd166','#06d6a0','#a855f7','#f97316','#ec4899','#84cc16','#14b8a6','#f59e0b'];
+
+function initDarkFleetCharts() {
+  const defaults = {
+    responsive: true,
+    plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1a2236', titleColor: '#e2e8f0', bodyColor: '#94a3b8', borderColor: '#1e2d4a', borderWidth: 1 } }
+  };
+
+  // Flag chart
+  new Chart(document.getElementById('flagChart'), {
+    type: 'bar',
+    data: {
+      labels: DARK_FLAGS.map(f => f[0]),
+      datasets: [{ data: DARK_FLAGS.map(f => f[1]), backgroundColor: CHART_COLORS, borderRadius: 4, borderSkipped: false }]
+    },
+    options: { ...defaults, indexAxis: 'y', scales: { x: { ticks: { color: '#64748b' }, grid: { color: '#1e2d4a' } }, y: { ticks: { color: '#94a3b8' }, grid: { display: false } } } }
+  });
+
+  // Size donut
+  new Chart(document.getElementById('sizeChart'), {
+    type: 'doughnut',
+    data: {
+      labels: DARK_SIZE.map(s => s[0]),
+      datasets: [{ data: DARK_SIZE.map(s => s[1]), backgroundColor: CHART_COLORS, borderColor: '#0a0e1a', borderWidth: 2 }]
+    },
+    options: { ...defaults, plugins: { ...defaults.plugins, legend: { display: true, position: 'bottom', labels: { color: '#94a3b8', boxWidth: 12, padding: 10 } } }, cutout: '60%' }
+  });
+
+  // Age bar
+  new Chart(document.getElementById('ageChart'), {
+    type: 'bar',
+    data: {
+      labels: DARK_AGE.sort((a,b) => a[0]-b[0]).map(a => a[0]),
+      datasets: [{ data: DARK_AGE.sort((a,b) => a[0]-b[0]).map(a => a[1]), backgroundColor: 'rgba(0,200,255,0.6)', borderRadius: 4 }]
+    },
+    options: { ...defaults, scales: { x: { ticks: { color: '#64748b' }, grid: { display: false } }, y: { ticks: { color: '#64748b' }, grid: { color: '#1e2d4a' } } } }
+  });
+
+  // Flow table
+  const maxBpd = FLOWS[0].bpd;
+  const tbody = document.getElementById('flowBody');
+  FLOWS.forEach((f, i) => {
+    const barW = Math.round((f.bpd / maxBpd) * 120);
+    tbody.innerHTML += `<tr>
+      <td class="rank-num">${i+1}</td>
+      <td><span class="route-from">${f.from}</span><span class="route-arrow">→</span><span class="route-to">${f.to}</span></td>
+      <td>
+        <div class="bpd-bar-wrap">
+          <div class="bpd-bar" style="width:${barW}px"></div>
+          <span class="bpd-val">${(f.bpd/1000).toFixed(0)}K</span>
+        </div>
+      </td>
+    </tr>`;
+  });
+}
+
+// ─── MAP + LOST & FOUND ───────────────────────────────────────────────────────
+let mapInitialized = false;
+function initMap() {
+  mapInitialized = true;
+  const map = L.map('map', { center: [24, 52], zoom: 5, zoomControl: true });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 20, attribution: '© OpenStreetMap contributors © CARTO' }).addTo(map);
+
+  const redIcon = L.divIcon({ html: '<div style="width:14px;height:14px;background:#ff5252;border:2px solid #fff;border-radius:50%;box-shadow:0 0 6px #ff5252"></div>', className: '', iconSize: [14,14], iconAnchor: [7,7] });
+  const yellowIcon = L.divIcon({ html: '<div style="width:14px;height:14px;background:#ffd166;border:2px solid #fff;border-radius:50%;box-shadow:0 0 6px #ffd166"></div>', className: '', iconSize: [14,14], iconAnchor: [7,7] });
+
+  TAKEN.forEach(v => {
+    L.marker([v.lat, v.lng], { icon: redIcon }).addTo(map)
+      .bindPopup(`<b>${v.name}</b><br>IMO: ${v.imo}<br>Taken: ${v.taken} (${v.days} days)<br>Last seen: ${v.lastSeen}`);
+  });
+  NAVY.forEach(v => {
+    L.marker([v.lat, v.lng], { icon: yellowIcon }).addTo(map)
+      .bindPopup(`<b>${v.name}</b><br>IMO: ${v.imo}<br>Last seen: ${v.lastSeen}`);
+  });
+
+  // Vessel cards
+  const takenEl = document.getElementById('takenCards');
+  TAKEN.forEach(v => {
+    takenEl.innerHTML += `<div class="vessel-card">
+      <div class="vessel-name">${v.name} <span class="days-badge">${v.days} days</span></div>
+      <div class="vessel-imo">IMO ${v.imo}</div>
+      <div class="vessel-meta">
+        <div class="meta-row"><span class="meta-key">Taken since</span><span class="meta-val danger">${v.taken}</span></div>
+        <div class="meta-row"><span class="meta-key">Last seen</span><span class="meta-val">${v.lastSeen}</span></div>
+        <div class="meta-row"><span class="meta-key">Coordinates</span><span class="meta-val coords">${v.lat}, ${v.lng}</span></div>
+      </div>
+    </div>`;
+  });
+
+  const navyEl = document.getElementById('navyCards');
+  NAVY.forEach(v => {
+    navyEl.innerHTML += `<div class="vessel-card navy">
+      <div class="vessel-name">${v.name}</div>
+      <div class="vessel-imo">IMO ${v.imo}</div>
+      <div class="vessel-meta">
+        <div class="meta-row"><span class="meta-key">Last seen</span><span class="meta-val">${v.lastSeen}</span></div>
+        <div class="meta-row"><span class="meta-key">Coordinates</span><span class="meta-val coords">${v.lat}, ${v.lng}</span></div>
+      </div>
+    </div>`;
+  });
+}
+
+// ─── SANCTIONED TABLE ─────────────────────────────────────────────────────────
+const VESSELS = SANCTIONED_RAW.map(r => ({
+  name: r[0], imo: r[1], built: r[2], size: r[3], flag: r[4],
+  ofac: r[5], fcdo: r[6], uani: r[7], eu: r[8]
+}));
+
+// Compute stats
+const ofacCount = VESSELS.filter(v => v.ofac).length;
+const euCount = VESSELS.filter(v => v.eu).length;
+const fcdoCount = VESSELS.filter(v => v.fcdo).length;
+document.getElementById('ofacCount').textContent = ofacCount;
+document.getElementById('euCount').textContent = euCount;
+document.getElementById('fcdoCount').textContent = fcdoCount;
+
+// Populate flag filter
+const flags = [...new Set(VESSELS.map(v => v.flag).filter(Boolean))].sort();
+const flagSel = document.getElementById('flagFilter');
+flags.forEach(f => { const o = document.createElement('option'); o.value = f; o.textContent = f; flagSel.appendChild(o); });
+
+let filtered = [...VESSELS];
+let sortKey = 'name';
+let sortDir = 1;
+let page = 1;
+const PER_PAGE = 50;
+
+function sizeTag(s) {
+  if (!s) return '';
+  const cls = s.includes('VLCC') ? 'size-vlcc' : s.includes('Suezmax') ? 'size-suezmax' : s.includes('Aframax') ? 'size-aframax' : s.includes('Panamax') ? 'size-panamax' : 'size-handy';
+  const short = s.includes('VLCC') ? 'VLCC' : s.includes('Suezmax') ? 'Suezmax' : s.includes('Aframax') ? 'Aframax' : s.includes('Panamax') ? 'Panamax' : 'Handy';
+  return `<span class="size-tag ${cls}">${short}</span>`;
+}
+
+function sanctionCell(date) {
+  return date ? `<span class="sanction-date"><span class="sanction-dot"></span>${date.substring(0,7)}</span>` : `<span class="no-sanction">—</span>`;
+}
+
+function renderTable() {
+  const tbody = document.getElementById('tableBody');
+  const start = (page - 1) * PER_PAGE;
+  const pageData = filtered.slice(start, start + PER_PAGE);
+  tbody.innerHTML = pageData.map(v =>
+    `<tr>
+      <td><a class="vessel-link" href="https://www.marinetraffic.com/en/ais/details/ships/imo:${v.imo}" target="_blank">${v.name}</a></td>
+      <td class="imo">${v.imo}</td>
+      <td>${v.built}</td>
+      <td>${sizeTag(v.size)}</td>
+      <td><div class="flag-cell">${v.flag}</div></td>
+      <td>${sanctionCell(v.ofac)}</td>
+      <td>${sanctionCell(v.fcdo)}</td>
+      <td>${sanctionCell(v.uani)}</td>
+      <td>${sanctionCell(v.eu)}</td>
+    </tr>`
+  ).join('');
+  document.getElementById('tableCount').textContent = `Showing ${start+1}–${Math.min(start+PER_PAGE, filtered.length)} of ${filtered.length} vessels`;
+  renderPagination();
+}
+
+function renderPagination() {
+  const totalPages = Math.ceil(filtered.length / PER_PAGE);
+  const pag = document.getElementById('pagination');
+  let html = `<span class="page-info">${totalPages} pages</span>`;
+  html += `<button class="page-btn" onclick="changePage(${page-1})" ${page<=1?'disabled':''}>← Prev</button>`;
+  const start = Math.max(1, page-2), end = Math.min(totalPages, page+2);
+  if (start > 1) html += `<button class="page-btn" onclick="changePage(1)">1</button>`;
+  if (start > 2) html += `<span class="page-info">…</span>`;
+  for (let i = start; i <= end; i++) html += `<button class="page-btn ${i===page?'active':''}" onclick="changePage(${i})">${i}</button>`;
+  if (end < totalPages-1) html += `<span class="page-info">…</span>`;
+  if (end < totalPages) html += `<button class="page-btn" onclick="changePage(${totalPages})">${totalPages}</button>`;
+  html += `<button class="page-btn" onclick="changePage(${page+1})" ${page>=totalPages?'disabled':''}>Next →</button>`;
+  pag.innerHTML = html;
+}
+
+function changePage(p) {
+  const total = Math.ceil(filtered.length / PER_PAGE);
+  page = Math.max(1, Math.min(p, total));
+  renderTable();
+  document.querySelector('.data-table-scroll').scrollTop = 0;
+}
+
+function filterTable() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const sz = document.getElementById('sizeFilter').value;
+  const fl = document.getElementById('flagFilter').value;
+  const sc = document.getElementById('sanctionFilter').value;
+  filtered = VESSELS.filter(v => {
+    if (q && !v.name.toLowerCase().includes(q) && !v.imo.includes(q)) return false;
+    if (sz && v.size !== sz) return false;
+    if (fl && v.flag !== fl) return false;
+    if (sc && !v[sc]) return false;
+    return true;
+  });
+  page = 1;
+  renderTable();
+}
+
+function sortTable(key) {
+  if (sortKey === key) sortDir *= -1;
+  else { sortKey = key; sortDir = 1; }
+  filtered.sort((a, b) => {
+    const av = a[key] || '', bv = b[key] || '';
+    return av < bv ? -sortDir : av > bv ? sortDir : 0;
+  });
+  renderTable();
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+initDarkFleetCharts();
+renderTable();
+
+// ─── LIVE AIS ─────────────────────────────────────────────────────────────────
+
+const REGIONS = [
+  { id: 'hormuz',   name: 'Strait of Hormuz',   boxes: [[[21.5, 55.0], [27.5, 61.0]]], checked: false },
+  { id: 'redsea',   name: 'Red Sea / Houthis',   boxes: [[[11.0, 41.0], [26.0, 45.5]]], checked: false },
+  { id: 'gulf',     name: 'Persian Gulf',         boxes: [[[22.0, 47.5], [30.0, 57.0]]], checked: false },
+  { id: 'blacksea', name: 'Black Sea',            boxes: [[[40.5, 27.5], [47.5, 42.0]]], checked: false },
+  { id: 'baltic',   name: 'Baltic / North Sea',  boxes: [[[52.0, 3.0], [66.0, 30.0]]], checked: false },
+  { id: 'med',      name: 'Mediterranean',        boxes: [[[29.0, -5.5], [47.0, 37.0]]], checked: false },
+  { id: 'malacca',  name: 'Malacca Strait',       boxes: [[[1.0, 98.0], [8.0, 107.0]]], checked: false },
+  { id: 'world',    name: '🌐 Entire World',       boxes: [[[-90, -180], [90, 180]]],    checked: true },
+];
+
+// Dark fleet flag countries for auto-flagging
+const DARK_FLAG_STATES = new Set([
+  'Russia','Panama','Cameroon','Sierra Leone','Iran','Comoros','Curaçao',
+  'Guyana','Hong Kong','Palau','Oman','Barbados','Madagascar','Marshall Islands',
+  'Mozambique','Guinea','Aruba','Gambia','Eq Guinea','Liberia','Honduras','Syria',
+  'Tuvalu','Vietnam','Benin','Mali','Angola'
+]);
+
+// Build IMO → sanctioned entry lookup from SANCTIONED_RAW
+const IMO_LOOKUP = {};
+SANCTIONED_RAW.forEach(r => { if (r[1]) IMO_LOOKUP[r[1]] = { name: r[0], size: r[3], flag: r[4] }; });
+
+// Build region checkboxes
+const regionList = document.getElementById('regionList');
+REGIONS.forEach(r => {
+  regionList.innerHTML += `
+    <label class="region-check">
+      <input type="checkbox" id="chk_${r.id}" ${r.checked ? 'checked' : ''}>
+      ${r.name}
+    </label>`;
+});
+
+let liveWs = null;
+let liveMap = null;
+let liveMapInit = false;
+let vesselLayer = null;
+let liveMarkers = {};     // MMSI → L.circleMarker
+let liveData = {};        // MMSI → {name, lat, lng, sog, cog, imo?, flagged}
+let matchedMMSIs = new Set();
+let msgCount = 0;
+let msgCountWindow = 0;
+let staticCount = 0;
+let feedRowCount = 0;
+const MAX_FEED_ROWS = 200;
+const MAX_MARKERS = 500;
+
+function toggleConnMode() {
+  const mode = document.getElementById('connMode').value;
+  document.getElementById('proxyUrlWrap').style.display  = mode === 'proxy'  ? '' : 'none';
+  document.getElementById('directKeyWrap').style.display = mode === 'direct' ? '' : 'none';
+}
+
+function initLiveMap() {
+  if (liveMapInit) return;
+  liveMapInit = true;
+  liveMap = L.map('liveMap', { center: [24, 52], zoom: 4 });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 20, attribution: '© OpenStreetMap contributors © CARTO' }).addTo(liveMap);
+  vesselLayer = L.layerGroup().addTo(liveMap);
+}
+
+function getMarkerColor(v) {
+  if (v.flagged) return '#ff5252';
+  if (v.darkFlag) return '#ffd166';
+  if (v.sog > 10)  return '#06d6a0';
+  return '#00c8ff';
+}
+
+function upsertMarker(mmsi, v) {
+  const color = getMarkerColor(v);
+  const r = v.flagged ? 8 : 5;
+  if (liveMarkers[mmsi]) {
+    liveMarkers[mmsi].setLatLng([v.lat, v.lng]);
+    liveMarkers[mmsi].setStyle({ color, fillColor: color });
+    liveMarkers[mmsi].setRadius(r);
+  } else {
+    if (Object.keys(liveMarkers).length >= MAX_MARKERS) {
+      // remove oldest non-flagged marker
+      const oldest = Object.keys(liveMarkers).find(k => !liveData[k]?.flagged);
+      if (oldest) { vesselLayer.removeLayer(liveMarkers[oldest]); delete liveMarkers[oldest]; }
+    }
+    liveMarkers[mmsi] = L.circleMarker([v.lat, v.lng], {
+      radius: r, color, fillColor: color, fillOpacity: 0.85, weight: 1.5
+    }).bindPopup(() => buildPopup(mmsi)).addTo(vesselLayer);
+  }
+}
+
+function buildPopup(mmsi) {
+  const v = liveData[mmsi] || {};
+  const flagIcon = v.flagged ? '⚠️ <strong style="color:#ff5252">SANCTIONED</strong><br>' : '';
+  const darkIcon = v.darkFlag ? '🚩 <span style="color:#ffd166">Dark fleet flag state</span><br>' : '';
+  return `<div style="font-family:monospace;font-size:12px;line-height:1.6">
+    ${flagIcon}${darkIcon}
+    <b>${v.name || '(unknown)'}</b><br>
+    MMSI: ${mmsi}${v.imo ? '<br>IMO: ' + v.imo : ''}<br>
+    ${v.lat?.toFixed(4)}, ${v.lng?.toFixed(4)}<br>
+    SOG: ${v.sog ?? '—'}kn &nbsp; COG: ${v.cog ?? '—'}°
+    ${v.sanctionInfo ? '<br><span style="color:#ff5252">'+v.sanctionInfo+'</span>' : ''}
+  </div>`;
+}
+
+function addFeedRow(type, mmsi, name, lat, lng, sog, extra) {
+  const log = document.getElementById('feedLog');
+  if (feedRowCount === 0) log.innerHTML = '';
+  feedRowCount++;
+  if (feedRowCount > MAX_FEED_ROWS) {
+    log.removeChild(log.lastChild);
+    feedRowCount--;
+  }
+  const isMatch = type === 'match';
+  const isStatic = type === 'static';
+  const t = new Date().toTimeString().slice(0,8);
+  const sogStr = sog != null ? `${sog.toFixed(1)}kn` : '';
+  const posStr = (lat && lng) ? `${lat.toFixed(2)},${lng.toFixed(2)}` : '';
+  const row = document.createElement('div');
+  row.className = `feed-row${isMatch ? ' match' : ''}${isStatic ? ' static' : ''}`;
+  row.innerHTML = `
+    <span class="feed-time">${t}</span>
+    <span class="feed-mmsi">${mmsi}</span>
+    <span class="feed-name">${name || '—'}</span>
+    <span class="feed-pos">${posStr}</span>
+    <span class="feed-sog">${sogStr}</span>
+    ${isMatch ? `<span class="feed-match">⚠️ SANCTIONED</span>` : ''}
+    ${extra ? `<span style="color:var(--accent3);font-size:10px;">${extra}</span>` : ''}
+  `;
+  log.prepend(row);
+}
+
+function handleAISMessage(raw) {
+  let msg;
+  try { msg = JSON.parse(raw); } catch { return; }
+  if (msg.error) { setStatus('error', '⛔ ' + msg.error); return; }
+
+  msgCount++;
+  msgCountWindow++;
+  const type = msg.MessageType;
+  const meta = msg.MetaData || {};
+  const mmsi = String(meta.MMSI || '');
+  if (!mmsi) return;
+
+  if (type === 'PositionReport' || type === 'StandardClassBPositionReport' || type === 'ExtendedClassBPositionReport') {
+    const pos = msg.Message?.[type] || {};
+    const lat  = meta.latitude  || pos.Latitude;
+    const lng  = meta.longitude || pos.Longitude;
+    const sog  = pos.Sog;
+    const cog  = pos.Cog;
+    const name = meta.ShipName?.trim() || liveData[mmsi]?.name || '';
+
+    if (!lat || !lng || lat === 0) return;
+
+    const existing = liveData[mmsi] || {};
+    const flagged  = existing.flagged || matchedMMSIs.has(mmsi);
+    const darkFlag = DARK_FLAG_STATES.has(existing.flag || '');
+
+    liveData[mmsi] = { ...existing, name, lat, lng, sog, cog, flagged, darkFlag };
+    upsertMarker(mmsi, liveData[mmsi]);
+    addFeedRow(flagged ? 'match' : 'pos', mmsi, name, lat, lng, sog);
+    updateStats();
+  }
+
+  else if (type === 'ShipStaticData') {
+    const data = msg.Message?.ShipStaticData || {};
+    const imo  = String(data.ImoNumber || '').replace(/^0+/, '');
+    const name = data.Name?.trim() || meta.ShipName?.trim() || '';
+    const flag = data.Flag || '';
+
+    staticCount++;
+    let matched = false;
+    let sanctionInfo = '';
+
+    if (imo && IMO_LOOKUP[imo]) {
+      matched = true;
+      matchedMMSIs.add(mmsi);
+      const s = IMO_LOOKUP[imo];
+      sanctionInfo = `${s.name} | ${s.size} | flag: ${s.flag}`;
+      if (liveData[mmsi]) {
+        liveData[mmsi].flagged = true;
+        liveData[mmsi].imo = imo;
+        liveData[mmsi].sanctionInfo = sanctionInfo;
+        upsertMarker(mmsi, liveData[mmsi]);
+      } else {
+        liveData[mmsi] = { name, flagged: true, imo, sanctionInfo, darkFlag: DARK_FLAG_STATES.has(flag) };
+      }
+    } else if (liveData[mmsi]) {
+      liveData[mmsi].imo = imo;
+      liveData[mmsi].flag = flag;
+      liveData[mmsi].darkFlag = DARK_FLAG_STATES.has(flag);
+    }
+
+    addFeedRow(matched ? 'match' : 'static', mmsi, name, null, null, null,
+      imo ? `IMO:${imo}${matched ? ' ⚠️ MATCH' : ''}` : 'no IMO');
+    updateStats();
+  }
+}
+
+function updateStats() {
+  document.getElementById('statVessels').textContent = Object.keys(liveData).length;
+  document.getElementById('statMatches').textContent = matchedMMSIs.size;
+  document.getElementById('statStatic').textContent  = staticCount;
+  document.getElementById('liveTabBadge').textContent = Object.keys(liveData).length || '—';
+}
+
+// Real-time msg counter
+setInterval(() => { document.getElementById('statMsgs').textContent = msgCount; }, 1000);
+
+function setStatus(state, text) {
+  const dot  = document.getElementById('statusDot');
+  const label = document.getElementById('statusText');
+  dot.className = 'status-dot ' + state;
+  label.textContent = text;
+  label.style.color = state === 'connected' ? 'var(--accent4)' : state === 'error' ? 'var(--accent2)' : 'var(--muted)';
+}
+
+function getSelectedBoxes() {
+  return REGIONS.filter(r => document.getElementById('chk_'+r.id)?.checked)
+                .flatMap(r => r.boxes);
+}
+
+function toggleConnect() {
+  if (liveWs && liveWs.readyState <= 1) { disconnect(); return; }
+  connect();
+}
+
+function connect() {
+  initLiveMap();
+  const mode     = document.getElementById('connMode').value;
+  const wsUrl    = mode === 'proxy'
+    ? (document.getElementById('proxyUrl').value || 'ws://localhost:8765')
+    : 'wss://stream.aisstream.io/v0/stream';
+  const apiKey   = document.getElementById('apiKeyInput').value.trim();
+  const boxes    = getSelectedBoxes();
+  const typeVal  = document.getElementById('typeFilter').value;
+
+  if (!boxes.length) { alert('Select at least one region.'); return; }
+  if (mode === 'direct' && !apiKey) { alert('Enter your aisstream.io API key.'); return; }
+
+  setStatus('connecting', 'Connecting…');
+  document.getElementById('connectBtn').textContent = '⏳ Connecting…';
+  document.getElementById('connectBtn').className = 'connect-btn disconnect';
+
+  try {
+    liveWs = new WebSocket(wsUrl);
+  } catch (e) {
+    setStatus('error', 'Invalid URL: ' + e.message);
+    document.getElementById('connectBtn').textContent = '▶ Connect';
+    document.getElementById('connectBtn').className = 'connect-btn connect';
+    return;
+  }
+
+  liveWs.onopen = () => {
+    setStatus('connected', '● Live');
+    document.getElementById('connectBtn').textContent = '■ Disconnect';
+
+    const sub = {
+      APIKey: mode === 'direct' ? apiKey : 'proxy-auth',  // proxy injects real key
+      BoundingBoxes: boxes,
+      FilterMessageTypes: ['PositionReport', 'ShipStaticData', 'StandardClassBPositionReport'],
+    };
+    liveWs.send(JSON.stringify(sub));
+  };
+
+  liveWs.onmessage = async e => {
+    const text = e.data instanceof Blob ? await e.data.text() : e.data;
+    handleAISMessage(text);
+  };
+
+  liveWs.onerror = () => {
+    if (mode === 'direct') {
+      setStatus('error', 'CORS blocked — use proxy mode');
+    } else {
+      setStatus('error', 'Connection error — is proxy running?');
+    }
+    resetConnectBtn();
+  };
+
+  liveWs.onclose = e => {
+    if (e.code !== 1000) setStatus('error', `Closed (${e.code})`);
+    else setStatus('disconnected', 'Disconnected');
+    resetConnectBtn();
+  };
+}
+
+function disconnect() {
+  if (liveWs) { liveWs.close(1000, 'user disconnect'); liveWs = null; }
+  setStatus('disconnected', 'Disconnected');
+  resetConnectBtn();
+}
+
+function resetConnectBtn() {
+  const btn = document.getElementById('connectBtn');
+  btn.textContent = '▶ Connect';
+  btn.className = 'connect-btn connect';
+}
+
+function clearFeed() {
+  document.getElementById('feedLog').innerHTML = '<div class="feed-empty">Feed cleared.</div>';
+  feedRowCount = 0;
+}
+
+// ── Hourly Data Refresh ───────────────────────────────────────────────────
+const DATA_API = 'http://localhost:8766';
+const _rptCache = {};
+
+async function fetchReport(type) {
+  try {
+    const r = await fetch(`${DATA_API}/data/${type}`);
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    _rptCache[type] = j;
+    applyReport(type, j);
+    const el = document.getElementById('refresh_' + type);
+    if (el) el.textContent = 'Updated ' + new Date(j.updated).toLocaleTimeString();
+    console.log('[refresh]', type, j.updated);
+  } catch(e) { console.warn('[refresh]', type, 'unavailable:', e.message); }
+}
+
+function applyReport(type, payload) {
+  const d = payload.data;
+  if (type === 'darkfleet' && d.total) {
+    document.querySelectorAll('.df-total-count').forEach(el => el.textContent = d.total.toLocaleString());
+    const ft = document.getElementById('dfFlagTable');
+    if (ft && d.flags) ft.innerHTML = d.flags.map(f => `<tr><td>${f.flag}</td><td style="text-align:right;padding-left:12px">${f.count}</td></tr>`).join('');
+    const st = document.getElementById('dfSizeTable');
+    if (st && d.sizes) st.innerHTML = d.sizes.map(s => `<tr><td>${s.cls}</td><td style="text-align:right;padding-left:12px">${s.count}</td></tr>`).join('');
+  }
+  if (type === 'lostandfound' && d.vessels) {
+    const tb = document.getElementById('lfTableBody');
+    if (!tb) return;
+    tb.innerHTML = d.vessels.map(v => `<tr>
+      <td>${v.taken ? '<span style="color:#ff5252">Taken '+v.taken+'</span>' : '<span style="color:#ffd166">Navy</span>'}</td>
+      <td><strong>${v.name}</strong></td>
+      <td style="font-family:monospace;font-size:11px">${v.imo}</td>
+      <td style="font-size:11px">${v.last_seen}</td>
+      <td style="font-size:11px">${v.lat.toFixed(3)}, ${v.lon.toFixed(3)}</td>
+    </tr>`).join('');
+  }
+  if (type === 'sanctioned' && d.count)
+    document.querySelectorAll('.sanc-total-count').forEach(el => el.textContent = d.count.toLocaleString());
+}
+
+['darkfleet','lostandfound','sanctioned'].forEach(fetchReport);
+async function _updateGlobalDate(type) {
+  try {
+    const r = await fetch(`${DATA_API}/data/${type}`);
+    if (!r.ok) return;
+    const j = await r.json();
+    const el = document.getElementById('globalUpdatedDate');
+    if (el) el.textContent = new Date(j.updated).toLocaleDateString('en-US', {month:'long',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  } catch(e) {}
+}
+_updateGlobalDate('darkfleet');
+setInterval(() => ['darkfleet','lostandfound','sanctioned'].forEach(fetchReport), 3600000);
+
+</script>
+</body>
+</html>
