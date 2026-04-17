@@ -19,6 +19,10 @@ A real-time maritime surveillance dashboard tracking dark fleet vessels, sanctio
 
 The proxy runs on ws://localhost:8765 (AIS stream) and http://localhost:8766 (hourly data refresh).
 
+## Data Attribution
+
+Vessel intelligence data is sourced from [TankerTrackers.com](https://tankertrackers.com), an independent research organization tracking sanctioned oil shipments, dark fleet activity, and vessel seizures globally.
+
 ## Data Sources
 
 - Dark Fleet: tankertrackers.com/report/darkfleetinfo
